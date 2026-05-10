@@ -1,29 +1,37 @@
 import { useEffect, useState } from "react";
+
 import {
   subscribeToStatus,
   markFed,
   getFeedHistory
 } from "./services/dogService";
+import {
+  subscribeToSettings
+} from "./services/settingsService";
+import SettingsPanel from "./components/SettingsPanel";
 import "./styles/app.css";
 
 export default function App() {
   const [status, setStatus] = useState(null);
+  const [settings, setSettings] = useState(null);
   const [history, setHistory] = useState([]);
+
   const [debugMode, setDebugMode] = useState(false);
   const [tapCount, setTapCount] = useState(0);
-  const [nameInput, setNameInput] = useState("");
 
-  const userName =
-    localStorage.getItem("name") || "Unknown Human";
-  
+  // -----------------------------
+  // Load Firestore streams
+  // -----------------------------
   useEffect(() => {
-    const unsubscribe = subscribeToStatus((data) => {
-      setStatus(data);
-    });
+    const unsubStatus = subscribeToStatus(setStatus);
+    const unsubSettings = subscribeToSettings(setSettings);
 
     loadHistory();
 
-    return () => unsubscribe();
+    return () => {
+      unsubStatus();
+      unsubSettings();
+    };
   }, []);
 
   const loadHistory = async () => {
@@ -31,11 +39,20 @@ export default function App() {
     setHistory(data);
   };
 
+  // -----------------------------
+  // Feed dog action
+  // -----------------------------
   const handleFed = async () => {
-    await markFed(userName);
+    if (!settings) return;
+
+    await markFed(settings.defaultName);
+
     await loadHistory();
   };
 
+  // -----------------------------
+  // Debug mode unlock (hidden feature)
+  // -----------------------------
   const handleDogTap = () => {
     const next = tapCount + 1;
 
@@ -47,49 +64,16 @@ export default function App() {
     setTapCount(next);
   };
 
-  if (!localStorage.getItem("name")) {
-    return (
-      <div className="app">
-        <div className="card">
-          <h1>🐶 Welcome</h1>
-
-          <p>Enter your name:</p>
-
-          <input
-            className="name-input"
-            value={nameInput}
-            onChange={(e) =>
-              setNameInput(e.target.value)
-            }
-            placeholder="Your name"
-          />
-
-          <button
-            className="feed-button"
-            onClick={() => {
-              if (!nameInput.trim()) {
-                return;
-              }
-
-              localStorage.setItem(
-                "name",
-                nameInput
-              );
-
-              window.location.reload();
-            }}
-          >
-            Save
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!status) {
+  // -----------------------------
+  // Loading state
+  // -----------------------------
+  if (!status || !settings) {
     return <div className="loading">Loading...</div>;
   }
 
+  // -----------------------------
+  // Daily feed check
+  // -----------------------------
   const alreadyFedToday =
     status.lastFedAt &&
     new Date(status.lastFedAt).toDateString() ===
@@ -97,11 +81,13 @@ export default function App() {
 
   return (
     <div className="app">
+      {/* Settings */}
+      <SettingsPanel />
+      {/* Main card */}
       <div className="card">
         <h1 onClick={handleDogTap}>
           🐶 Dog Feeder
         </h1>
-
         <div className="status">
           <p>
             <strong>Last Fed:</strong>
@@ -110,11 +96,10 @@ export default function App() {
               ? new Date(status.lastFedAt).toLocaleString()
               : "Not yet"}
           </p>
-
           <p>
             <strong>Fed By:</strong>
             <br />
-            {status.fedBy || "Nobody Yet"}
+            {status.fedBy || "Nobody yet"}
           </p>
         </div>
 
@@ -138,10 +123,9 @@ export default function App() {
           </div>
         )}
       </div>
-
+      {/* Feed history */}
       <div className="card history-card">
         <h2>📜 Feed History</h2>
-
         <table>
           <thead>
             <tr>
@@ -155,9 +139,7 @@ export default function App() {
               <tr key={entry.id}>
                 <td>{entry.fedBy}</td>
                 <td>
-                  {new Date(
-                    entry.fedAt
-                  ).toLocaleString()}
+                  {new Date(entry.fedAt).toLocaleString()}
                 </td>
               </tr>
             ))}

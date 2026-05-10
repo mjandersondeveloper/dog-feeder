@@ -11,47 +11,100 @@ exports.reminderCheck = onSchedule(
     region: "us-central1"
   },
   async () => {
-    const docRef = db.collection("dog").doc("status");
-    const snapshot = await docRef.get();
+    const statusRef = db.collection("dog").doc("status");
+    const settingsRef = db.collection("dog").doc("settings");
 
-    if (!snapshot.exists) {
-      console.log("Dog status document missing");
+    const [statusSnap, settingsSnap] = await Promise.all([
+      statusRef.get(),
+      settingsRef.get()
+    ]);
+
+    if (!statusSnap.exists || !settingsSnap.exists) {
+      console.log("Missing status or settings");
       return;
     }
 
-    const data = snapshot.data();
-    const now = Date.now();
+    const status = statusSnap.data();
+    const settings = settingsSnap.data();
 
-    // Snoozed?
-    if (data.snoozedUntil && now < data.snoozedUntil) {
-      console.log("Notifications snoozed");
+    const now = new Date();
+    const nowMs = Date.now();
+
+    // -----------------------------
+    // 1. Snooze check
+    // -----------------------------
+    if (status.snoozedUntil && nowMs < status.snoozedUntil) {
+      console.log("Snoozed");
       return;
     }
 
+    // -----------------------------
+    // 2. Daily reminder time check
+    // -----------------------------
+    const reminderHour = settings.reminderHour ?? 18;
+    const reminderMinute = settings.reminderMinute ?? 0;
+
+    const reminderTime = new Date();
+    reminderTime.setHours(reminderHour, reminderMinute, 0, 0);
+
+    const isAfterReminderTime = now >= reminderTime;
+
+    // -----------------------------
+    // 3. Feed cooldown (4 hours safety)
+    // -----------------------------
     const fourHours = 4 * 60 * 60 * 1000;
 
+    const lastFedAt = status.lastFedAt
+      ? new Date(status.lastFedAt)
+      : null;
+
+    const notRecentlyFed =
+      !lastFedAt ||
+      nowMs - lastFedAt.getTime() > fourHours;
+
+    // -----------------------------
+    // 4. Prevent duplicate daily reminder
+    // -----------------------------
+    const alreadyRemindedToday = !!status.reminderSent;
+
+    // -----------------------------
+    // 5. FINAL DECISION
+    // -----------------------------
     const shouldNotify =
-      !data.lastFedAt ||
-      now - data.lastFedAt > fourHours;
+      isAfterReminderTime &&
+      notRecentlyFed &&
+      !alreadyRemindedToday;
 
-    if (shouldNotify && !data.reminderSent) {
-      await sendPush(
-        data.tokens || [],
-        "Feed the dog! 🐶"
-      );
-
-      await docRef.update({
-        reminderSent: true
-      });
-
-      console.log("Reminder sent");
+    if (!shouldNotify) {
+      console.log("No reminder needed");
+      return;
     }
+
+    // -----------------------------
+    // 6. Send notification
+    // -----------------------------
+    await sendPush(
+      status.tokens || [],
+      "🐶 Time to feed the dog!"
+    );
+
+    // -----------------------------
+    // 7. Mark reminder as sent for today
+    // -----------------------------
+    await statusRef.update({
+      reminderSent: true
+    });
+
+    console.log("Reminder sent");
   }
 );
 
+// -----------------------------
+// Push helper
+// -----------------------------
 async function sendPush(tokens, message) {
-  if (!tokens.length) {
-    console.log("No tokens found");
+  if (!tokens || tokens.length === 0) {
+    console.log("No tokens");
     return;
   }
 
