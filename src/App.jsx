@@ -1,67 +1,169 @@
 import { useEffect, useState } from "react";
-import { getStatus, markFed, setSnooze, saveToken } from "./services/dogService";
-import { requestNotificationPermission } from "./services/firebase";
+import {
+  subscribeToStatus,
+  markFed,
+  getFeedHistory
+} from "./services/dogService";
+import "./styles/app.css";
 
 export default function App() {
   const [status, setStatus] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [debugMode, setDebugMode] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+  const [nameInput, setNameInput] = useState("");
 
+  const userName =
+    localStorage.getItem("name") || "Unknown Human";
+  
   useEffect(() => {
-    load();
+    const unsubscribe = subscribeToStatus((data) => {
+      setStatus(data);
+    });
+
+    loadHistory();
+
+    return () => unsubscribe();
   }, []);
 
-  const load = async () => {
-    const data = await getStatus();
-    setStatus(data);
+  const loadHistory = async () => {
+    const data = await getFeedHistory();
+    setHistory(data);
   };
 
   const handleFed = async () => {
-    await markFed("Mark");
-    await load();
-    alert("Dog fed!");
+    await markFed(userName);
+    await loadHistory();
   };
 
-  const handleEnableNotifications = async () => {
-    const token = await requestNotificationPermission();
-    if (token) {
-      await saveToken(token);
-      alert("Notifications enabled");
+  const handleDogTap = () => {
+    const next = tapCount + 1;
+
+    if (next >= 5) {
+      setDebugMode(true);
+      alert("🐶 Debug mode enabled");
     }
+
+    setTapCount(next);
   };
 
-  const handleSnooze = async () => {
-    const hours = prompt("Snooze for how many hours?");
-    const ts = Date.now() + hours * 60 * 60 * 1000;
-    await setSnooze(ts);
-    await load();
-  };
+  if (!localStorage.getItem("name")) {
+    return (
+      <div className="app">
+        <div className="card">
+          <h1>🐶 Welcome</h1>
 
-  if (!status) return <div>Loading...</div>;
+          <p>Enter your name:</p>
 
-  const lastFed = status.lastFedAt
-    ? new Date(status.lastFedAt).toLocaleString()
-    : "Not yet";
+          <input
+            className="name-input"
+            value={nameInput}
+            onChange={(e) =>
+              setNameInput(e.target.value)
+            }
+            placeholder="Your name"
+          />
+
+          <button
+            className="feed-button"
+            onClick={() => {
+              if (!nameInput.trim()) {
+                return;
+              }
+
+              localStorage.setItem(
+                "name",
+                nameInput
+              );
+
+              window.location.reload();
+            }}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!status) {
+    return <div className="loading">Loading...</div>;
+  }
+
+  const alreadyFedToday =
+    status.lastFedAt &&
+    new Date(status.lastFedAt).toDateString() ===
+      new Date().toDateString();
 
   return (
-    <div style={{ padding: 20, fontFamily: "sans-serif" }}>
-      <h1>🐶 Dog Feeder</h1>
-      <p><strong>Last Fed:</strong> {lastFed}</p>
-      <p><strong>By:</strong> {status.fedBy || "-"}</p>
+    <div className="app">
+      <div className="card">
+        <h1 onClick={handleDogTap}>
+          🐶 Dog Feeder
+        </h1>
 
-      <button onClick={handleFed} style={{ fontSize: 20 }}>
-        ✅ I Fed the Dog
-      </button>
+        <div className="status">
+          <p>
+            <strong>Last Fed:</strong>
+            <br />
+            {status.lastFedAt
+              ? new Date(status.lastFedAt).toLocaleString()
+              : "Not yet"}
+          </p>
 
-      <br /><br />
+          <p>
+            <strong>Fed By:</strong>
+            <br />
+            {status.fedBy || "Nobody Yet"}
+          </p>
+        </div>
 
-      <button onClick={handleEnableNotifications}>
-        🔔 Enable Notifications
-      </button>
+        <button
+          className={`feed-button ${
+            alreadyFedToday && !debugMode
+              ? "disabled"
+              : ""
+          }`}
+          disabled={alreadyFedToday && !debugMode}
+          onClick={handleFed}
+        >
+          {alreadyFedToday && !debugMode
+            ? "✅ Fed Today"
+            : "🍖 I Fed The Dog"}
+        </button>
 
-      <br /><br />
+        {debugMode && (
+          <div className="debug-banner">
+            DEBUG MODE ENABLED
+          </div>
+        )}
+      </div>
 
-      <button onClick={handleSnooze}>
-        😴 Snooze
-      </button>
+      <div className="card history-card">
+        <h2>📜 Feed History</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Fed By</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {history.map((entry) => (
+              <tr key={entry.id}>
+                <td>{entry.fedBy}</td>
+                <td>
+                  {new Date(
+                    entry.fedAt
+                  ).toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
