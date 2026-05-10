@@ -1,141 +1,215 @@
 body {
   margin: 0;
-  background: #1f2937;
-  color: white;
-  font-family: Arial, sans-serif;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: #0f172a;
+  color: #e5e7eb;
 }
 
+/* =========================
+   App Layout
+========================= */
 .app {
+  max-width: 720px;
+  margin: 0 auto;
   padding: 24px;
-  max-width: 700px;
-  margin: auto;
 }
 
+/* =========================
+   CARD SYSTEM (core UI feel)
+========================= */
 .card {
-  background: #374151;
+  background: #1f2937;
   border-radius: 16px;
   padding: 24px;
   margin-bottom: 20px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+
+  box-shadow:
+    0 10px 25px rgba(0, 0, 0, 0.35);
+
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-h1,
+/* Headings */
+h1 {
+  margin: 0 0 16px 0;
+  font-size: 28px;
+}
+
 h2 {
-  margin-top: 0;
+  margin: 0 0 12px 0;
+  font-size: 20px;
 }
 
-.status {
-  margin-bottom: 20px;
+/* =========================
+   STATUS BLOCK
+========================= */
+.status p {
+  margin: 10px 0;
+  line-height: 1.5;
 }
 
-.feed-button {
+/* =========================
+   BUTTON SYSTEM
+========================= */
+button {
   width: 100%;
-  padding: 16px;
+  padding: 14px 16px;
+  margin-top: 10px;
+
   border: none;
   border-radius: 12px;
-  font-size: 18px;
+
+  font-size: 16px;
+  font-weight: 600;
+
   cursor: pointer;
-  background: #10b981;
+
+  transition: all 0.15s ease-in-out;
+}
+
+/* Primary button (Feed Dog) */
+button:not(.secondary-button):not(.settings-button) {
+  background: #22c55e;
   color: white;
-  transition: 0.2s;
 }
 
-.feed-button:hover {
-  background: #059669;
+button:not(.secondary-button):not(.settings-button):hover {
+  background: #16a34a;
+  transform: translateY(-1px);
 }
 
-.feed-button.disabled {
+/* Disabled state */
+button:disabled {
   background: #6b7280;
   cursor: not-allowed;
+  transform: none;
 }
 
-.feed-button:focus {
-  outline: none;
+/* Secondary button */
+.secondary-button {
+  background: #334155;
+  color: white;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+.secondary-button:hover {
+  background: #475569;
+  transform: translateY(-1px);
 }
 
-th,
-td {
-  text-align: left;
-  padding: 12px;
-}
-
-tr:nth-child(even) {
-  background: rgba(255,255,255,0.05);
-}
-
-.debug-banner {
-  margin-top: 12px;
-  color: #fbbf24;
-  font-weight: bold;
-}
-
-.loading {
-  padding: 40px;
-  text-align: center;
-}
-
-.name-input {
-  width: 100%;
-  padding: 14px;
-  border-radius: 10px;
-  border: none;
-  margin-bottom: 16px;
-  font-size: 16px;
-  box-sizing: border-box;
-}
-
-.name-input:focus {
-  outline: none;
-}
-
+/* =========================
+   SETTINGS BUTTON (floating)
+========================= */
 .settings-button {
   position: fixed;
   top: 16px;
   right: 16px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: none;
-  background: #111827;
-  color: white;
+
+  width: auto;
+  padding: 10px 12px;
+
+  background: rgba(17, 24, 39, 0.55);
+  color: rgba(255, 255, 255, 0.85);
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+
+  font-size: 14px;
+  font-weight: 500;
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
   cursor: pointer;
+
+  transition: all 0.2s ease;
 }
 
-.modal-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
+/* hover state (subtle lift, not aggressive) */
+.settings-button:hover {
+  background: rgba(17, 24, 39, 0.75);
+  transform: translateY(-1px);
+  color: white;
+}
+
+/* active click feel */
+.settings-button:active {
+  transform: translateY(0px);
+}
+
+/* =========================
+   TABLE (history)
+========================= */
+table {
   width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-collapse: collapse;
+  margin-top: 10px;
 }
 
+th, td {
+  text-align: left;
+  padding: 12px;
+}
+
+th {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* =========================
+   MODAL (settings panel)
+========================= */
 .modal {
-  background: #1f2937;
-  padding: 24px;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+
+  transform: translate(-50%, -50%);
+
+  background: #111827;
+  padding: 20px;
+
   border-radius: 16px;
-  width: 320px;
+
+  width: 340px;
+
   display: flex;
   flex-direction: column;
   gap: 10px;
+
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+
+  z-index: 1000;
 }
 
-.modal input {
+/* Inputs */
+input {
   padding: 10px;
   border-radius: 8px;
   border: none;
+
+  background: #1f2937;
+  color: white;
+
+  outline: none;
 }
 
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 10px;
+/* Labels */
+label {
+  font-size: 13px;
+  opacity: 0.85;
+  margin-top: 6px;
+}
+
+/* =========================
+   LOADING STATE
+========================= */
+.loading {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 18px;
+  opacity: 0.8;
 }

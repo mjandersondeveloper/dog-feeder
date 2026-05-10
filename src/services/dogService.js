@@ -9,27 +9,28 @@ import {
   limit,
   getDocs
 } from "firebase/firestore";
+
 import { db } from "./firebase";
 
 const statusRef = doc(db, "dog", "status");
 
-export const subscribeToStatus = (callback) => {
-  return onSnapshot(statusRef, (snapshot) => {
-    callback(snapshot.data());
+export const subscribeToStatus = (cb) => {
+  return onSnapshot(statusRef, (snap) => {
+    cb(snap.data());
   });
 };
 
-export const markFed = async (user) => {
+export const markFed = async (userName) => {
   const now = Date.now();
 
   await updateDoc(statusRef, {
     lastFedAt: now,
-    fedBy: user,
+    fedBy: userName,
     reminderSent: false
   });
 
   await addDoc(collection(db, "dogFeedHistory"), {
-    fedBy: user,
+    fedBy: userName,
     fedAt: now
   });
 };
@@ -47,10 +48,10 @@ export const getFeedHistory = async () => {
     limit(10)
   );
 
-  const snapshot = await getDocs(q);
+  const snap = await getDocs(q);
 
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data()
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data()
   }));
 };

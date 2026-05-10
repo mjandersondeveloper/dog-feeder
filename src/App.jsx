@@ -1,79 +1,90 @@
+import "./styles/app.css";
 import { useEffect, useState } from "react";
 
 import {
   subscribeToStatus,
   markFed,
-  getFeedHistory
+  getFeedHistory,
+  setSnooze
 } from "./services/dogService";
+
 import {
   subscribeToSettings
 } from "./services/settingsService";
+
+import {
+  subscribeToUser,
+  updateUser
+} from "./services/userService";
+
 import SettingsPanel from "./components/SettingsPanel";
-import "./styles/app.css";
+
+import {
+  registerServiceWorker,
+  requestNotificationPermission,
+  listenForMessages
+} from "./services/firebase";
 
 export default function App() {
   const [status, setStatus] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [user, setUser] = useState(null);
   const [history, setHistory] = useState([]);
 
-  const [debugMode, setDebugMode] = useState(false);
-  const [tapCount, setTapCount] = useState(0);
-
-  // -----------------------------
-  // Load Firestore streams
-  // -----------------------------
   useEffect(() => {
     const unsubStatus = subscribeToStatus(setStatus);
     const unsubSettings = subscribeToSettings(setSettings);
+    const unsubUser = subscribeToUser(setUser);
 
     loadHistory();
 
     return () => {
       unsubStatus();
       unsubSettings();
+      unsubUser();
     };
   }, []);
 
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
+
+  useEffect(() => {
+    const initFCM = async () => {
+      if (!user) return;
+
+      const token = await requestNotificationPermission();
+
+      if (token) {
+        await updateUser({ token });
+      }
+
+      listenForMessages();
+    };
+
+    initFCM();
+  }, [user]);
+
   const loadHistory = async () => {
-    const data = await getFeedHistory();
-    setHistory(data);
+    setHistory(await getFeedHistory());
   };
 
-  // -----------------------------
-  // Feed dog action
-  // -----------------------------
   const handleFed = async () => {
-    if (!settings) return;
-
-    await markFed(settings.defaultName);
-
+    await markFed(user.name);
     await loadHistory();
   };
 
-  // -----------------------------
-  // Debug mode unlock (hidden feature)
-  // -----------------------------
-  const handleDogTap = () => {
-    const next = tapCount + 1;
+  const handleSnooze = async () => {
+    const snoozeUntil =
+      Date.now() + settings.defaultSnoozeHours * 60 * 60 * 1000;
 
-    if (next >= 5) {
-      setDebugMode(true);
-      alert("🐶 Debug mode enabled");
-    }
-
-    setTapCount(next);
+    await setSnooze(snoozeUntil);
   };
 
-  // -----------------------------
-  // Loading state
-  // -----------------------------
-  if (!status || !settings) {
-    return <div className="loading">Loading...</div>;
+  if (!status || !settings || !user) {
+    return <div>Loading...</div>;
   }
 
-  // -----------------------------
-  // Daily feed check
-  // -----------------------------
   const alreadyFedToday =
     status.lastFedAt &&
     new Date(status.lastFedAt).toDateString() ===
@@ -81,51 +92,55 @@ export default function App() {
 
   return (
     <div className="app">
-      {/* Settings */}
+
       <SettingsPanel />
-      {/* Main card */}
+
       <div className="card">
-        <h1 onClick={handleDogTap}>
-          🐶 Dog Feeder
-        </h1>
+        <h1>🐶 Dog Feeder</h1>
+
         <div className="status">
           <p>
-            <strong>Last Fed:</strong>
-            <br />
+            <strong>Last Fed:</strong><br />
             {status.lastFedAt
               ? new Date(status.lastFedAt).toLocaleString()
               : "Not yet"}
           </p>
+
           <p>
-            <strong>Fed By:</strong>
-            <br />
+            <strong>Fed By:</strong><br />
             {status.fedBy || "Nobody yet"}
           </p>
+
+          {status.snoozedUntil &&
+            Date.now() < status.snoozedUntil && (
+              <p>
+                <strong>Snoozed Until:</strong><br />
+                {new Date(status.snoozedUntil).toLocaleString()}
+              </p>
+          )}
         </div>
 
         <button
-          className={`feed-button ${
-            alreadyFedToday && !debugMode
-              ? "disabled"
-              : ""
-          }`}
-          disabled={alreadyFedToday && !debugMode}
+          className="feed-button"
           onClick={handleFed}
+          disabled={alreadyFedToday}
         >
-          {alreadyFedToday && !debugMode
-            ? "✅ Fed Today"
+          {alreadyFedToday
+            ? "✅ Already Fed"
             : "🍖 I Fed The Dog"}
         </button>
 
-        {debugMode && (
-          <div className="debug-banner">
-            DEBUG MODE ENABLED
-          </div>
-        )}
+        <button
+          className="secondary-button"
+          onClick={handleSnooze}
+        >
+          😴 Snooze Reminders
+        </button>
       </div>
-      {/* Feed history */}
-      <div className="card history-card">
+
+      <div className="card">
         <h2>📜 Feed History</h2>
+
         <table>
           <thead>
             <tr>
@@ -135,17 +150,16 @@ export default function App() {
           </thead>
 
           <tbody>
-            {history.map((entry) => (
-              <tr key={entry.id}>
-                <td>{entry.fedBy}</td>
-                <td>
-                  {new Date(entry.fedAt).toLocaleString()}
-                </td>
+            {history.map((h) => (
+              <tr key={h.id}>
+                <td>{h.fedBy}</td>
+                <td>{new Date(h.fedAt).toLocaleString()}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
     </div>
   );
 }

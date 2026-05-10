@@ -12,16 +12,68 @@ const firebaseConfig = {
   measurementId: "G-04BY0NDQ7Z"
 };
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
-export const messaging = getMessaging(app);
 
-export const requestNotificationPermission = async () => {
-  const permission = await Notification.requestPermission();
-  if (permission === "granted") {
-    const token = await getToken(messaging, {
-      vapidKey: "BNf2DZy04ygatabEREkc-ta6tPf4zT1xrXQlwsU-_aQZbdng5Cm0E0xOH-1SM0PjbyOn5iZixpNNsPmYvwjuzRI"
-    });
-    return token;
+/**
+ * Registers service worker (IMPORTANT for push notifications)
+ */
+export const registerServiceWorker = async () => {
+  if (!("serviceWorker" in navigator)) return null;
+
+  const swPath = import.meta.env.BASE_URL + "firebase-messaging-sw.js";
+
+  try {
+    const registration = await navigator.serviceWorker.register(swPath);
+    console.log("✅ SW registered:", registration.scope);
+    return registration;
+  } catch (err) {
+    console.error("❌ SW registration failed:", err);
+    return null;
   }
+};
+
+/**
+ * Request permission + get FCM token
+ */
+export const requestNotificationPermission = async () => {
+  try {
+    if (!("Notification" in window)) return null;
+
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return null;
+
+    const messaging = getMessaging(app);
+
+    const swRegistration = await navigator.serviceWorker.ready;
+
+    const token = await getToken(messaging, {
+      vapidKey: "BNf2DZy04ygatabEREkc-ta6tPf4zT1xrXQlwsU-_aQZbdng5Cm0E0xOH-1SM0PjbyOn5iZixpNNsPmYvwjuzRI",
+      serviceWorkerRegistration: swRegistration
+    });
+
+    console.log("🔥 FCM Token generated successfully");
+
+    return token;
+  } catch (err) {
+    console.error("🔥 FCM Token not generated:", err);
+    return null;
+  }
+};
+
+/**
+ * Foreground message handler
+ */
+export const listenForMessages = () => {
+  const messaging = getMessaging(app);
+
+  onMessage(messaging, (payload) => {
+    console.log("📩 Foreground message:", payload);
+
+    alert(
+      payload.notification?.title +
+        "\n" +
+        payload.notification?.body
+    );
+  });
 };

@@ -1,99 +1,108 @@
 import { useEffect, useState } from "react";
-import {
-  subscribeToSettings,
-  updateSettings
-} from "../services/settingsService";
+import { subscribeToSettings, updateSettings } from "../services/settingsService";
+import { subscribeToUser, updateUser } from "../services/userService";
 
 export default function SettingsPanel() {
   const [settings, setSettings] = useState(null);
+  const [user, setUser] = useState(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const unsub = subscribeToSettings(setSettings);
-    return () => unsub();
+    const unsubSettings = subscribeToSettings(setSettings);
+    const unsubUser = subscribeToUser(setUser);
+
+    return () => {
+      unsubSettings();
+      unsubUser();
+    };
   }, []);
 
-  if (!settings) return null;
-
-  const handleChange = (field, value) => {
-    setSettings({
-      ...settings,
-      [field]: value
-    });
-  };
+  if (!settings || !user) {
+    return null;
+  }
 
   const save = async () => {
-    await updateSettings(settings);
+    await updateSettings({
+      reminderHour: settings.reminderHour,
+      reminderMinute: settings.reminderMinute,
+      defaultSnoozeHours: settings.defaultSnoozeHours
+    });
+
+    await updateUser({
+      name: user.name,
+      notificationsEnabled: user.notificationsEnabled
+    });
+
     setOpen(false);
   };
 
   return (
     <>
-      <button
-        className="settings-button"
-        onClick={() => setOpen(true)}
-      >
+      <button className="settings-button" onClick={() => setOpen(true)}>
         ⚙️ Settings
       </button>
 
       {open && (
-        <div className="modal-backdrop">
-          <div className="modal">
-            <h2>Settings ⚙️</h2>
+        <div className="modal">
 
-            <label>Name</label>
-            <input
-              value={settings.defaultName}
-              onChange={(e) =>
-                handleChange(
-                  "defaultName",
-                  e.target.value
-                )
-              }
-            />
+          <h2>Settings</h2>
 
-            <label>Daily Reminder Time</label>
-            <input
-                type="time"
-                value={`${String(settings.reminderHour).padStart(2, "0")}:${String(
-                    settings.reminderMinute
-                ).padStart(2, "0")}`}
-                onChange={(e) => {
-                    const [hour, minute] = e.target.value.split(":");
-
-                    handleChange("reminderHour", Number(hour));
-                    handleChange("reminderMinute", Number(minute));
-                }}
-            />
-
-            <label>Snooze Until</label>
-            <input
-            type="datetime-local"
-            value={
-                settings.snoozedUntil
-                ? new Date(settings.snoozedUntil)
-                    .toISOString()
-                    .slice(0, 16)
-                : ""
+          <label>Name</label>
+          <input
+            value={user.name}
+            onChange={(e) =>
+              setUser({
+                ...user,
+                name: e.target.value
+              })
             }
+          />
+
+          <label>Reminder Time</label>
+          <input
+            type="time"
+            value={`${String(settings.reminderHour).padStart(2, "0")}:${String(settings.reminderMinute).padStart(2, "0")}`}
             onChange={(e) => {
-                handleChange(
-                "snoozedUntil",
-                new Date(e.target.value).getTime()
-                );
+              const [h, m] = e.target.value.split(":");
+
+              setSettings({
+                ...settings,
+                reminderHour: Number(h),
+                reminderMinute: Number(m)
+              });
             }}
-            />
+          />
 
-            <div className="modal-actions">
-              <button onClick={() => setOpen(false)}>
-                Cancel
-              </button>
+          <label>
+            Notifications
+          </label>
+          <input
+            type="checkbox"
+            checked={user.notificationsEnabled}
+            onChange={(e) =>
+              setUser({
+                ...user,
+                notificationsEnabled: e.target.checked
+              })
+            }
+          />
 
-              <button onClick={save}>
-                Save
-              </button>
-            </div>
-          </div>
+          <label>Default Snooze Hours</label>
+          <input
+            type="number"
+            value={settings.defaultSnoozeHours}
+            onChange={(e) =>
+              setSettings({
+                ...settings,
+                defaultSnoozeHours: Number(e.target.value)
+              })
+            }
+          />
+
+          <button onClick={save}>
+            Save
+          </button>
+
         </div>
       )}
     </>
