@@ -1,35 +1,57 @@
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import {
+  doc,
+  updateDoc,
+  onSnapshot,
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  limit,
+  getDocs
+} from "firebase/firestore";
+
 import { db } from "./firebase";
 
-const ref = doc(db, "dog", "status");
+const statusRef = doc(db, "dog", "status");
 
-export const getStatus = async () => {
-  const snap = await getDoc(ref);
-  return snap.data();
+export const subscribeToStatus = (cb) => {
+  return onSnapshot(statusRef, (snap) => {
+    cb(snap.data());
+  });
 };
 
-export const markFed = async (user) => {
-  await updateDoc(ref, {
-    lastFedAt: Date.now(),
-    fedBy: user,
+export const markFed = async (userName) => {
+  const now = Date.now();
+
+  await updateDoc(statusRef, {
+    lastFedAt: now,
+    fedBy: userName,
     reminderSent: false
+  });
+
+  await addDoc(collection(db, "dogFeedHistory"), {
+    fedBy: userName,
+    fedAt: now
   });
 };
 
 export const setSnooze = async (timestamp) => {
-  await updateDoc(ref, {
+  await updateDoc(statusRef, {
     snoozedUntil: timestamp
   });
 };
 
-export const saveToken = async (token) => {
-  const snap = await getDoc(ref);
-  const data = snap.data();
-  const tokens = data.tokens || [];
+export const getFeedHistory = async () => {
+  const q = query(
+    collection(db, "dogFeedHistory"),
+    orderBy("fedAt", "desc"),
+    limit(10)
+  );
 
-  if (!tokens.includes(token)) {
-    await updateDoc(ref, {
-      tokens: [...tokens, token]
-    });
-  }
+  const snap = await getDocs(q);
+
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data()
+  }));
 };

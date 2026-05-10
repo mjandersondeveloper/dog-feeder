@@ -1,67 +1,165 @@
+import "./styles/app.css";
 import { useEffect, useState } from "react";
-import { getStatus, markFed, setSnooze, saveToken } from "./services/dogService";
-import { requestNotificationPermission } from "./services/firebase";
+
+import {
+  subscribeToStatus,
+  markFed,
+  getFeedHistory,
+  setSnooze
+} from "./services/dogService";
+
+import {
+  subscribeToSettings
+} from "./services/settingsService";
+
+import {
+  subscribeToUser,
+  updateUser
+} from "./services/userService";
+
+import SettingsPanel from "./components/SettingsPanel";
+
+import {
+  registerServiceWorker,
+  requestNotificationPermission,
+  listenForMessages
+} from "./services/firebase";
 
 export default function App() {
   const [status, setStatus] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [user, setUser] = useState(null);
+  const [history, setHistory] = useState([]);
 
   useEffect(() => {
-    load();
+    const unsubStatus = subscribeToStatus(setStatus);
+    const unsubSettings = subscribeToSettings(setSettings);
+    const unsubUser = subscribeToUser(setUser);
+
+    loadHistory();
+
+    return () => {
+      unsubStatus();
+      unsubSettings();
+      unsubUser();
+    };
   }, []);
 
-  const load = async () => {
-    const data = await getStatus();
-    setStatus(data);
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
+
+  useEffect(() => {
+    const initFCM = async () => {
+      if (!user) return;
+
+      const token = await requestNotificationPermission();
+
+      if (token) {
+        await updateUser({ token });
+      }
+
+      listenForMessages();
+    };
+
+    initFCM();
+  }, [user]);
+
+  const loadHistory = async () => {
+    setHistory(await getFeedHistory());
   };
 
   const handleFed = async () => {
-    await markFed("Mark");
-    await load();
-    alert("Dog fed!");
-  };
-
-  const handleEnableNotifications = async () => {
-    const token = await requestNotificationPermission();
-    if (token) {
-      await saveToken(token);
-      alert("Notifications enabled");
-    }
+    await markFed(user.name);
+    await loadHistory();
   };
 
   const handleSnooze = async () => {
-    const hours = prompt("Snooze for how many hours?");
-    const ts = Date.now() + hours * 60 * 60 * 1000;
-    await setSnooze(ts);
-    await load();
+    const snoozeUntil =
+      Date.now() + settings.defaultSnoozeHours * 60 * 60 * 1000;
+
+    await setSnooze(snoozeUntil);
   };
 
-  if (!status) return <div>Loading...</div>;
+  if (!status || !settings || !user) {
+    return <div>Loading...</div>;
+  }
 
-  const lastFed = status.lastFedAt
-    ? new Date(status.lastFedAt).toLocaleString()
-    : "Not yet";
+  const alreadyFedToday =
+    status.lastFedAt &&
+    new Date(status.lastFedAt).toDateString() ===
+      new Date().toDateString();
 
   return (
-    <div style={{ padding: 20, fontFamily: "sans-serif" }}>
-      <h1>🐶 Dog Feeder</h1>
-      <p><strong>Last Fed:</strong> {lastFed}</p>
-      <p><strong>By:</strong> {status.fedBy || "-"}</p>
+    <div className="app">
 
-      <button onClick={handleFed} style={{ fontSize: 20 }}>
-        ✅ I Fed the Dog
-      </button>
+      <SettingsPanel />
 
-      <br /><br />
+      <div className="card">
+        <h1>🐶 Dog Feeder</h1>
 
-      <button onClick={handleEnableNotifications}>
-        🔔 Enable Notifications
-      </button>
+        <div className="status">
+          <p>
+            <strong>Last Fed:</strong><br />
+            {status.lastFedAt
+              ? new Date(status.lastFedAt).toLocaleString()
+              : "Not yet"}
+          </p>
 
-      <br /><br />
+          <p>
+            <strong>Fed By:</strong><br />
+            {status.fedBy || "Nobody yet"}
+          </p>
 
-      <button onClick={handleSnooze}>
-        😴 Snooze
-      </button>
+          {status.snoozedUntil &&
+            Date.now() < status.snoozedUntil && (
+              <p>
+                <strong>Snoozed Until:</strong><br />
+                {new Date(status.snoozedUntil).toLocaleString()}
+              </p>
+          )}
+        </div>
+
+        <button
+          className="feed-button"
+          onClick={handleFed}
+          disabled={alreadyFedToday}
+        >
+          {alreadyFedToday
+            ? "✅ Already Fed"
+            : "🍖 I Fed The Dog"}
+        </button>
+
+        <button
+          className="secondary-button"
+          onClick={handleSnooze}
+        >
+          😴 Snooze Reminders
+        </button>
+      </div>
+
+      <div className="card">
+        <h2>📜 Feed History</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Fed By</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {history.map((h) => (
+              <tr key={h.id}>
+                <td>{h.fedBy}</td>
+                <td>{new Date(h.fedAt).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
     </div>
   );
 }

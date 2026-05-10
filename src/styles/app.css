@@ -1,0 +1,215 @@
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+/* =========================
+   App Layout
+========================= */
+.app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* =========================
+   CARD SYSTEM (core UI feel)
+========================= */
+.card {
+  background: #1f2937;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 20px;
+
+  box-shadow:
+    0 10px 25px rgba(0, 0, 0, 0.35);
+
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Headings */
+h1 {
+  margin: 0 0 16px 0;
+  font-size: 28px;
+}
+
+h2 {
+  margin: 0 0 12px 0;
+  font-size: 20px;
+}
+
+/* =========================
+   STATUS BLOCK
+========================= */
+.status p {
+  margin: 10px 0;
+  line-height: 1.5;
+}
+
+/* =========================
+   BUTTON SYSTEM
+========================= */
+button {
+  width: 100%;
+  padding: 14px 16px;
+  margin-top: 10px;
+
+  border: none;
+  border-radius: 12px;
+
+  font-size: 16px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: all 0.15s ease-in-out;
+}
+
+/* Primary button (Feed Dog) */
+button:not(.secondary-button):not(.settings-button) {
+  background: #22c55e;
+  color: white;
+}
+
+button:not(.secondary-button):not(.settings-button):hover {
+  background: #16a34a;
+  transform: translateY(-1px);
+}
+
+/* Disabled state */
+button:disabled {
+  background: #6b7280;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Secondary button */
+.secondary-button {
+  background: #334155;
+  color: white;
+}
+
+.secondary-button:hover {
+  background: #475569;
+  transform: translateY(-1px);
+}
+
+/* =========================
+   SETTINGS BUTTON (floating)
+========================= */
+.settings-button {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+
+  width: auto;
+  padding: 10px 12px;
+
+  background: rgba(17, 24, 39, 0.55);
+  color: rgba(255, 255, 255, 0.85);
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+
+  font-size: 14px;
+  font-weight: 500;
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  cursor: pointer;
+
+  transition: all 0.2s ease;
+}
+
+/* hover state (subtle lift, not aggressive) */
+.settings-button:hover {
+  background: rgba(17, 24, 39, 0.75);
+  transform: translateY(-1px);
+  color: white;
+}
+
+/* active click feel */
+.settings-button:active {
+  transform: translateY(0px);
+}
+
+/* =========================
+   TABLE (history)
+========================= */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+th, td {
+  text-align: left;
+  padding: 12px;
+}
+
+th {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* =========================
+   MODAL (settings panel)
+========================= */
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+
+  transform: translate(-50%, -50%);
+
+  background: #111827;
+  padding: 20px;
+
+  border-radius: 16px;
+
+  width: 340px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+
+  z-index: 1000;
+}
+
+/* Inputs */
+input {
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+
+  background: #1f2937;
+  color: white;
+
+  outline: none;
+}
+
+/* Labels */
+label {
+  font-size: 13px;
+  opacity: 0.85;
+  margin-top: 6px;
+}
+
+/* =========================
+   LOADING STATE
+========================= */
+.loading {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 18px;
+  opacity: 0.8;
+}
