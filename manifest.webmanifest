@@ -1,0 +1,1 @@
+{"name":"Dog Feeder","short_name":"DogFeeder","description":"Dog feeding reminder app","start_url":"/dog-feeder/","display":"standalone","background_color":"#111827","theme_color":"#111827","lang":"en","scope":"/dog-feeder/","icons":[{"src":"/dog-feeder/icon-192.png","sizes":"192x192","type":"image/png"},{"src":"/dog-feeder/icon-512.png","sizes":"512x512","type":"image/png"}]}
