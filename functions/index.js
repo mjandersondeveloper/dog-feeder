@@ -1,21 +1,9 @@
-const admin =
-  require("firebase-admin");
-
-const {
-  onSchedule
-} = require(
-  "firebase-functions/v2/scheduler"
-);
-const {
-  onRequest
-} = require(
-  "firebase-functions/v2/https"
-);
+const admin = require("firebase-admin");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onRequest } = require("firebase-functions/v2/https");
 
 admin.initializeApp();
-
-const db =
-  admin.firestore();
+const db = admin.firestore();
 
 exports.reminderCheck =
   onSchedule(
@@ -28,93 +16,49 @@ exports.reminderCheck =
     },
 
     async () => {
+      const statusRef = db.collection("dog").doc("status");
+      const settingsRef = db.collection("dog").doc("settings");
+      const usersRef = db.collection("users");
 
-      const statusRef =
-        db.collection("dog")
-          .doc("status");
-
-      const settingsRef =
-        db.collection("dog")
-          .doc("settings");
-
-      const usersRef =
-        db.collection("users");
-
-      const [
-        statusSnap,
-        settingsSnap,
-        usersSnap
-      ] = await Promise.all([
+      const [statusSnap, settingsSnap, usersSnap] = await Promise.all([
         statusRef.get(),
         settingsRef.get(),
         usersRef.get()
       ]);
 
-      if (
-        !statusSnap.exists ||
-        !settingsSnap.exists
-      ) {
-        console.log(
-          "Missing docs"
-        );
-
+      if (!statusSnap.exists || !settingsSnap.exists) {
+        console.log("Missing docs");
         return;
       }
 
-      const status =
-        statusSnap.data();
-
-      const settings =
-        settingsSnap.data();
-
-      const now =
-        new Date();
-
-      const nowMs =
-        Date.now();
+      const status = statusSnap.data();
+      const settings = settingsSnap.data();
+      const now = new Date();
+      const nowMs = Date.now();
 
       const timeZone = "America/New_York";
       const nowLocal = getDateInTimeZone(now, timeZone);
 
       // Snooze
-      if (
-        status.snoozedUntil &&
-        nowMs <
-          status.snoozedUntil
-      ) {
-        console.log(
-          "Snoozed"
-        );
-
+      if (status.snoozedUntil && nowMs < status.snoozedUntil) {
+        console.log("Snoozed");
         return;
       }
 
       // Reminder time
-      const reminderHour =
-        settings.reminderHour ??
-        18;
+      const reminderHour = settings.reminderHour ?? 18;
+      const reminderMinute = settings.reminderMinute ?? 0;
+      const reminderTime = new Date(nowLocal);
 
-      const reminderMinute =
-        settings.reminderMinute ??
-        0;
+      reminderTime.setHours(reminderHour, reminderMinute, 0, 0);
 
-      const reminderTime =
-        new Date(nowLocal);
-
-      reminderTime.setHours(
-        reminderHour,
-        reminderMinute,
-        0,
-        0
-      );
-
-      const isAfterReminderTime =
-        nowLocal >= reminderTime;
-
+      const isAfterReminderTime = nowLocal >= reminderTime;
       const lastFedAt = status.lastFedAt
         ? status.lastFedAt.toDate
           ? status.lastFedAt.toDate()
-          : status.lastFedAt
+          : status.lastFedAt instanceof Date
+          ? status.lastFedAt
+          : new Date(status.lastFedAt)
         : null;
 
       // Check if dog was fed today
@@ -141,10 +85,7 @@ exports.reminderCheck =
         reminderSentAt &&
         timeSinceLastReminder < reminderFrequencyMs;
 
-      const shouldNotify =
-        isAfterReminderTime &&
-        !fedToday && // Only if not fed today
-        shouldSendReminder;
+      const shouldNotify = isAfterReminderTime && !fedToday && shouldSendReminder;
 
       if (!shouldNotify) {
         console.log(
@@ -154,7 +95,6 @@ exports.reminderCheck =
             ? "Reminder sent recently, waiting..."
             : "No reminder needed"
         );
-
         return;
       }
 
@@ -189,18 +129,9 @@ exports.reminderCheck =
     }
   );
 
-async function sendPush(
-  tokens,
-  notification
-) {
-
-  if (
-    !tokens ||
-    tokens.length === 0
-  ) {
-    console.log(
-      "No tokens"
-    );
+async function sendPush(tokens, notification) {
+  if (!tokens || tokens.length === 0) {
+    console.log("No tokens");
 
     return {
       successCount: 0,
