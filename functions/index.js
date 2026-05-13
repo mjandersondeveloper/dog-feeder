@@ -73,6 +73,9 @@ exports.reminderCheck =
       const nowMs =
         Date.now();
 
+      const timeZone = "America/New_York";
+      const nowLocal = getDateInTimeZone(now, timeZone);
+
       // Snooze
       if (
         status.snoozedUntil &&
@@ -96,7 +99,7 @@ exports.reminderCheck =
         0;
 
       const reminderTime =
-        new Date();
+        new Date(nowLocal);
 
       reminderTime.setHours(
         reminderHour,
@@ -106,7 +109,7 @@ exports.reminderCheck =
       );
 
       const isAfterReminderTime =
-        now >= reminderTime;
+        nowLocal >= reminderTime;
 
       // Feed cooldown
       const fourHours =
@@ -217,6 +220,35 @@ async function sendPush(
       tokens,
       notification
     });
+}
+
+function getDateInTimeZone(date, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: false
+  }).formatToParts(date);
+
+  const map = {};
+  for (const part of parts) {
+    if (part.type !== "literal") {
+      map[part.type] = part.value;
+    }
+  }
+
+  return new Date(Date.UTC(
+    Number(map.year),
+    Number(map.month) - 1,
+    Number(map.day),
+    Number(map.hour),
+    Number(map.minute),
+    Number(map.second)
+  ));
 }
 
 exports.sendDogFedNotification = onRequest(
