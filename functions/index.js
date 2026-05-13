@@ -111,25 +111,10 @@ exports.reminderCheck =
       const isAfterReminderTime =
         nowLocal >= reminderTime;
 
-      // Feed cooldown
-      const fourHours =
-        4 *
-        60 *
-        60 *
-        1000;
-
-      const lastFedAt =
-        status.lastFedAt
-          ? new Date(
-              status.lastFedAt
-            )
-          : null;
-
-      const notRecentlyFed =
-        !lastFedAt ||
-        nowMs -
-          lastFedAt.getTime() >
-          fourHours;
+      // Check if dog was fed today
+      const fedToday =
+        lastFedAt &&
+        lastFedAt.toDateString() === nowLocal.toDateString();
 
       // Reminder frequency (every 4 hours after initial reminder)
       const reminderFrequencyMs = 4 * 60 * 60 * 1000; // 4 hours
@@ -152,12 +137,14 @@ exports.reminderCheck =
 
       const shouldNotify =
         isAfterReminderTime &&
-        notRecentlyFed &&
+        !fedToday && // Only if not fed today
         shouldSendReminder;
 
       if (!shouldNotify) {
         console.log(
-          alreadyRemindedRecently
+          fedToday
+            ? "Dog already fed today"
+            : alreadyRemindedRecently
             ? "Reminder sent recently, waiting..."
             : "No reminder needed"
         );
