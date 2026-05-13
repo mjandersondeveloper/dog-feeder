@@ -111,6 +111,12 @@ exports.reminderCheck =
       const isAfterReminderTime =
         nowLocal >= reminderTime;
 
+      const lastFedAt = status.lastFedAt
+        ? status.lastFedAt.toDate
+          ? status.lastFedAt.toDate()
+          : status.lastFedAt
+        : null;
+
       // Check if dog was fed today
       const fedToday =
         lastFedAt &&
