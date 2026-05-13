@@ -1,10 +1,5 @@
-importScripts(
-  "https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"
-);
-
-importScripts(
-  "https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"
-);
+importScripts("https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js");
 
 firebase.initializeApp({
   apiKey: "AIzaSyBXO76RlgSt8sxZz9YX3j8S5ku28edEFYY",
@@ -14,19 +9,35 @@ firebase.initializeApp({
   appId: "1:239152156232:web:dc87e3e19911474db8927d"
 });
 
-const messaging = firebase.messaging();
+firebase.messaging();
 
 /**
- * Background notifications
+ * RAW PUSH EVENT HANDLER
+ * More reliable for PWAs than onBackgroundMessage()
  */
-messaging.onBackgroundMessage((payload) => {
-  console.log("📬 Background message:", payload);
+self.addEventListener("push", (event) => {
+  console.log("📬 RAW PUSH:", event);
 
-  self.registration.showNotification(
-    payload.notification?.title || "Dog Feeder",
-    {
-      body: payload.notification?.body || "",
-      icon: "/dog-feeder/icon.png"
-    }
+  if (!event.data) {
+    return;
+  }
+
+  const payload = event.data.json();
+
+  console.log("📦 PUSH PAYLOAD:", payload);
+
+  const title =
+    payload.notification?.title || "🐶 Dog Reminder";
+
+  const options = {
+    body:
+      payload.notification?.body || "Feed the dog!",
+    icon: "/dog-feeder/icon.png",
+    badge: "/dog-feeder/icon.png",
+    vibrate: [200, 100, 200]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
   );
 });
