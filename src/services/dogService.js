@@ -25,8 +25,7 @@ export const markFed = async (userName) => {
 
   await updateDoc(statusRef, {
     lastFedAt: now,
-    fedBy: userName,
-    reminderSent: false
+    fedBy: userName
   });
 
   await addDoc(collection(db, "dogFeedHistory"), {

@@ -128,18 +128,35 @@ exports.reminderCheck =
           lastFedAt.getTime() >
           fourHours;
 
-      // Already reminded
-      const alreadyRemindedToday =
-        !!status.reminderSent;
+      // Reminder frequency (every 4 hours after initial reminder)
+      const reminderFrequencyMs = 4 * 60 * 60 * 1000; // 4 hours
+
+      const reminderSentAt = status.reminderSentAt
+        ? new Date(status.reminderSentAt)
+        : null;
+
+      const timeSinceLastReminder = reminderSentAt
+        ? nowMs - reminderSentAt.getTime()
+        : Infinity;
+
+      const shouldSendReminder =
+        reminderSentAt === null || // Never sent
+        timeSinceLastReminder >= reminderFrequencyMs; // 4+ hours since last
+
+      const alreadyRemindedRecently =
+        reminderSentAt &&
+        timeSinceLastReminder < reminderFrequencyMs;
 
       const shouldNotify =
         isAfterReminderTime &&
         notRecentlyFed &&
-        !alreadyRemindedToday;
+        shouldSendReminder;
 
       if (!shouldNotify) {
         console.log(
-          "No reminder needed"
+          alreadyRemindedRecently
+            ? "Reminder sent recently, waiting..."
+            : "No reminder needed"
         );
 
         return;
@@ -167,7 +184,7 @@ exports.reminderCheck =
       });
 
       await statusRef.update({
-        reminderSent: true
+        reminderSentAt: nowMs
       });
 
       console.log(
