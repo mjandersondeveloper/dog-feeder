@@ -41,3 +41,12 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(title, options)
   );
 });
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "TEST_NOTIFICATION") {
+    self.registration.showNotification("🐶 SW Test", {
+      body: "Service worker notifications work!",
+      icon: "/dog-feeder/icon.png"
+    });
+  }
+});
