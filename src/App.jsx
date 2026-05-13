@@ -1,29 +1,15 @@
 import "./styles/app.css";
 import { useEffect, useState } from "react";
-
 import {
   subscribeToStatus,
   markFed,
   getFeedHistory,
   setSnooze
 } from "./services/dogService";
-
-import {
-  subscribeToSettings
-} from "./services/settingsService";
-
-import {
-  subscribeToUser,
-  updateUser
-} from "./services/userService";
-
+import { subscribeToSettings } from "./services/settingsService";
+import { subscribeToUser, updateUser } from "./services/userService";
 import SettingsPanel from "./components/SettingsPanel";
-
-import {
-  registerServiceWorker,
-  requestNotificationPermission,
-  listenForMessages
-} from "./services/firebase";
+import { requestNotificationPermission, listenForMessages } from "./services/firebase";
 
 export default function App() {
   const [status, setStatus] = useState(null);
@@ -43,10 +29,6 @@ export default function App() {
       unsubSettings();
       unsubUser();
     };
-  }, []);
-
-  useEffect(() => {
-    registerServiceWorker();
   }, []);
 
   useEffect(() => {
@@ -92,12 +74,9 @@ export default function App() {
 
   return (
     <div className="app">
-
       <SettingsPanel />
-
       <div className="card">
         <h1>🐶 Dog Feeder</h1>
-
         <div className="status">
           <p>
             <strong>Last Fed:</strong><br />
@@ -105,7 +84,6 @@ export default function App() {
               ? new Date(status.lastFedAt).toLocaleString()
               : "Not yet"}
           </p>
-
           <p>
             <strong>Fed By:</strong><br />
             {status.fedBy || "Nobody yet"}
@@ -129,7 +107,6 @@ export default function App() {
             ? "✅ Already Fed"
             : "🍖 I Fed The Dog"}
         </button>
-
         <button
           className="secondary-button"
           onClick={handleSnooze}
@@ -140,7 +117,6 @@ export default function App() {
 
       <div className="card">
         <h2>📜 Feed History</h2>
-
         <table>
           <thead>
             <tr>
@@ -148,7 +124,6 @@ export default function App() {
               <th>Time</th>
             </tr>
           </thead>
-
           <tbody>
             {history.map((h) => (
               <tr key={h.id}>
@@ -159,7 +134,6 @@ export default function App() {
           </tbody>
         </table>
       </div>
-
     </div>
   );
 }

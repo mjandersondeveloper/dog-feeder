@@ -9,16 +9,19 @@ export default defineConfig({
     react(),
 
     VitePWA({
+      strategies: "injectManifest",
+
+      srcDir: "public",
+      filename: "sw.js",
+
       registerType: "autoUpdate",
 
       manifest: {
         name: "Dog Feeder",
         short_name: "DogFeeder",
-        description: "Dog feeding reminder app",
+        display: "standalone",
         theme_color: "#111827",
         background_color: "#111827",
-        display: "standalone",
-        start_url: "/dog-feeder/",
 
         icons: [
           {

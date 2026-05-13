@@ -156,10 +156,10 @@ exports.reminderCheck =
               user.token
           );
 
-      await sendPush(
-        tokens,
-        "🐶 Time to feed the dog!"
-      );
+      await sendPush(tokens, {
+        title: "Dog Reminder",
+        body: "🐶 Time to feed the dog!"
+      });
 
       await statusRef.update({
         reminderSent: true
@@ -173,7 +173,7 @@ exports.reminderCheck =
 
 async function sendPush(
   tokens,
-  message
+  notification
 ) {
 
   if (
@@ -184,18 +184,15 @@ async function sendPush(
       "No tokens"
     );
 
-    return;
+    return {
+      successCount: 0,
+      failureCount: 0
+    };
   }
 
-  await admin.messaging()
+  return await admin.messaging()
     .sendEachForMulticast({
       tokens,
-
-      notification: {
-        title:
-          "Dog Reminder",
-
-        body: message
-      }
+      notification
     });
 }
