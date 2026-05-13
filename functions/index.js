@@ -6,6 +6,11 @@ const {
 } = require(
   "firebase-functions/v2/scheduler"
 );
+const {
+  onRequest
+} = require(
+  "firebase-functions/v2/https"
+);
 
 admin.initializeApp();
 
@@ -157,7 +162,7 @@ exports.reminderCheck =
           );
 
       await sendPush(tokens, {
-        title: "Dog Reminder",
+        title: "Woof! Feed Reminder!",
         body: "🐶 Time to feed the dog!"
       });
 
@@ -196,3 +201,37 @@ async function sendPush(
       notification
     });
 }
+
+exports.sendDogFedNotification = onRequest(
+  {
+    cors: true
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).send("Method Not Allowed");
+      return;
+    }
+
+    const usersSnap = await db.collection("users").get();
+
+    const tokens = usersSnap.docs
+      .map((doc) => doc.data())
+      .filter(
+        (user) =>
+          user.notificationsEnabled &&
+          user.token
+      )
+      .map((user) => user.token);
+
+    const sendResult = await sendPush(tokens, {
+      title: "Woof! Dog Fed!",
+      body: "🐶 Thanks for the brown rocks!"
+    });
+
+    res.status(200).send({
+      success: true,
+      sent: sendResult.successCount,
+      failed: sendResult.failureCount
+    });
+  }
+);

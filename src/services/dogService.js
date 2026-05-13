@@ -33,6 +33,13 @@ export const markFed = async (userName) => {
     fedBy: userName,
     fedAt: now
   });
+
+  // Send notification to all devices
+  try {
+    await sendDogFedNotification();
+  } catch (err) {
+    console.error("Failed to send dog fed notification:", err);
+  }
 };
 
 export const setSnooze = async (timestamp) => {
@@ -54,4 +61,25 @@ export const getFeedHistory = async () => {
     id: d.id,
     ...d.data()
   }));
+};
+
+export const sendDogFedNotification = async () => {
+  const url =
+    "https://us-central1-dog-feeder-43696.cloudfunctions.net/sendDogFedNotification";
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Notification failed: ${response.status} ${errorText}`
+    );
+  }
+
+  return response.json();
 };
