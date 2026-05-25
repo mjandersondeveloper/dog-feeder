@@ -10,6 +10,8 @@ export default defineConfig({
 
     VitePWA({
       strategies: "injectManifest",
+      injectRegister: "auto",
+      includeAssets: ["favicon.svg", "icon.png", "icon-192.png", "icon-512.png", "notification-badge.png"],
 
       srcDir: "public",
       filename: "sw.js",
@@ -18,10 +20,12 @@ export default defineConfig({
 
       manifest: {
         name: "Dog Feeder",
-        short_name: "DogFeeder",
+        short_name: "Dog Feeder",
         display: "standalone",
         theme_color: "#111827",
         background_color: "#111827",
+        start_url: "/dog-feeder/",
+        scope: "/dog-feeder/",
 
         icons: [
           {

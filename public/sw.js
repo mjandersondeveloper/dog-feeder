@@ -29,7 +29,7 @@ self.addEventListener("push", (event) => {
   const options = {
     body: payload.notification?.body || "Feed the dog!",
     icon: "/dog-feeder/icon-192.png",
-    badge: "/dog-feeder/icon-192.png",
+    badge: "/dog-feeder/notification-badge.png",
     tag: "dog-feeder-notification",
     requireInteraction: true
   };
@@ -39,5 +39,24 @@ self.addEventListener("push", (event) => {
       .catch((err) => {
         console.error("❌ Failed to show push notification:", err);
       })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const targetUrl = "/dog-feeder/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(targetUrl) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
   );
 });
