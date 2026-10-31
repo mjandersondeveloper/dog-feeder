@@ -24,11 +24,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
 
       - name: Run lint
         run: npm run lint
@@ -44,11 +42,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: functions/package-lock.json
 
       - name: Install Functions dependencies
-        run: npm ci --prefix functions
+        run: npm install
+        working-directory: functions
 
       - name: Run unit tests
         run: npm --prefix functions test
@@ -64,11 +61,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build frontend
         run: npm run build
