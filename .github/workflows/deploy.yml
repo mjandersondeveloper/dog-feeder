@@ -1,4 +1,4 @@
-name: Intialize Deploy
+name: Initialize Deploy
 
 on:
   push:
