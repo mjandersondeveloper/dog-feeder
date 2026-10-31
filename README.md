@@ -6,7 +6,7 @@ A Progressive Web App (PWA) for tracking when your dog has been fed, with automa
 
 - ✅ **Mark Dog As Fed** - One-click button to log that the dog has been fed (disabled once daily)
 - 📬 **Push Notifications** - Automatic reminders when the dog hasn't been fed
-- ⏰ **Smart Reminders** - Configurable reminder time with throttling (sends reminder every 4 hours max)
+- ⏰ **Smart Reminders** - Configurable local reminder time, repeated every 4 hours until feeding is recorded
 - 😴 **Snooze Functionality** - Temporarily pause reminders for a configurable duration
 - 📜 **Feed History** - View the 10 most recent feeding logs with who fed the dog and when
 - 👥 **Multi-Device Support** - Syncs data across all devices using the same device ID
@@ -24,7 +24,7 @@ A Progressive Web App (PWA) for tracking when your dog has been fed, with automa
 **Backend & Database:**
 - Firebase Firestore (real-time database)
 - Firebase Cloud Messaging (FCM) - push notifications
-- Firebase Cloud Functions (scheduled reminders, notification endpoints)
+- Firebase Cloud Functions and Cloud Tasks (event-driven reminders and feed notifications)
 
 **Deployment:**
 - Frontend: GitHub Pages
@@ -34,7 +34,7 @@ A Progressive Web App (PWA) for tracking when your dog has been fed, with automa
 
 ### Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 22+ and npm
 - Firebase account (free tier works)
 - Git
 
@@ -57,9 +57,9 @@ A Progressive Web App (PWA) for tracking when your dog has been fed, with automa
                     ┌────────────┴────────────┐
                     ▼                         ▼
             ┌──────────────────┐    ┌──────────────────┐
-            │ Cloud Function 1 │    │ Cloud Function 2 │
-            │  reminderCheck   │    │ sendDogFedNotif. │
-            │  (every 15 min)  │    │  (on demand)     │
+            │ Firestore change │    │ Cloud Tasks      │
+            │   triggers       │    │ reminderDispatch │
+            │                 │    │ (one-shot tasks) │
             └──────────────────┘    └──────────────────┘
 ```
 
@@ -71,36 +71,24 @@ A Progressive Web App (PWA) for tracking when your dog has been fed, with automa
 User clicks "I Fed The Dog"
     ↓
 markFed() updates Firestore:
-  - dog/status: { lastFedAt, fedBy, reminderSentAt = null }
+  - dog/status: { lastFedAt, fedBy }
   - dogFeedHistory: { fedBy, fedAt } (new document)
     ↓
-Sends notification to all users:
+Firestore trigger sends notification to enabled devices:
   "🐶 Thanks for the brown rocks!"
     ↓
 Feed history updates on all devices (real-time subscription)
 ```
 
-#### 2. Reminder System (Cloud Function)
+#### 2. Reminder System (Cloud Tasks)
 
-**Runs every 15 minutes:**
+Firestore changes to `dog/status` or `dog/settings` recalculate the next eligible reminder and enqueue one task. The task checks the current state before sending; stale tasks from a feed, snooze, or settings change are discarded. After sending, it schedules the next task four hours later.
 
-1. Check if reminders are snoozed
-   - If `status.snoozedUntil > now`, skip sending reminder
-2. Check if dog was fed today
-   - Compare `lastFedAt.toDateString()` with today's date
-3. Check reminder time
-   - If current time < reminder time (default 6 PM), don't send
-4. Check reminder frequency
-   - Only send if never sent today OR 4+ hours since last reminder
-5. Send notification via FCM to all users with `notificationsEnabled: true`
-6. Update `status.reminderSentAt` timestamp
-
-**Example timeline:**
-- 6:00 PM → First reminder sent, `reminderSentAt` = 6:00 PM
-- 7:00 PM → Dog not fed, but < 4 hours since reminder, skip
-- 10:00 PM → Dog not fed, 4 hours since reminder → Send second reminder
-- Next day before 6 PM → No reminder
-- Next day 6 PM → If dog not fed, send reminder again
+- Reminder times and feed-date comparisons use `America/New_York`.
+- If the dog was fed today, reminders resume at the configured time the next day.
+- If no feed has been recorded, the first reminder is sent at the configured time and repeats every four hours until feeding is recorded, including overnight.
+- An active snooze moves the next task to the later of the snooze expiry and the next eligible reminder time.
+- No periodic reminder scan runs while there is no reminder due.
 
 #### 3. Settings Management
 
@@ -124,7 +112,8 @@ UI re-renders with new values
   lastFedAt: timestamp,          // When dog was last fed
   fedBy: string,                 // Name of person who fed dog
   snoozedUntil: timestamp,       // Reminders paused until this time
-  reminderSentAt: timestamp      // When last reminder was sent
+  reminderSentAt: timestamp,     // When last reminder was sent
+  reminderScheduleBootstrapAt: timestamp // One-time task schedule initialization
 }
 ```
 
@@ -136,6 +125,18 @@ UI re-renders with new values
   defaultSnoozeHours: number     // How long to snooze (in hours)
 }
 ```
+
+**`dog/reminderScheduler`** - Internal task-queue state
+```javascript
+{
+  generation: number,           // Invalidates tasks after relevant state changes
+  sourceSignature: string,      // Feed, snooze, and reminder-time inputs
+  nextReminderAt: timestamp,   // Due time for the single queued reminder
+  nextTaskId: string            // Deterministic id for task deduplication
+}
+```
+
+**`notificationEvents`** - Feed-notification delivery deduplication state
 
 **`users`** - Device-specific user info (one per device)
 ```javascript
@@ -156,16 +157,15 @@ UI re-renders with new values
 
 ### Notification System
 
-1. **Token Generation**
-   - On app load, requests notification permission from browser
-   - Generates FCM token via Firebase Cloud Messaging
-   - Stores token in `users/{deviceId}` document
-   - Syncs token with every app session
+1. **Token Registration**
+   - The user explicitly enables notifications in Settings, allowing the browser permission prompt to run from a user action.
+   - When permission is already granted, app startup refreshes the FCM token and updates the device record only when it changes.
+   - Token setup failures are shown in the UI.
 
 2. **Push Notifications (Background)**
-   - Service Worker receives push event
-   - Displays notification with icon and badge
-   - Sets `requireInteraction: true` so notification persists
+   - The custom service worker receives the push event and displays it with app-scoped icon and badge paths.
+   - Reminder and feed notifications use separate notification tags.
+   - Invalid or expired FCM tokens are removed after delivery failures.
 
 3. **Foreground Messages**
    - If app is open, FCM message triggers `onMessage` listener
@@ -258,11 +258,16 @@ Your site will be live at: `https://<username>.github.io/dog-feeder/`
 ### Deploy Cloud Functions
 
 ```bash
-cd functions
 firebase deploy --only functions
 ```
 
-Functions will be deployed to Firebase and accessible via their HTTP endpoints.
+The app initializes the first reminder task on its next load. For headless initialization, run the command from `functions/` in an environment authenticated with Google Application Default Credentials and Firestore/Cloud Tasks permissions:
+
+```bash
+npm run bootstrap:reminders
+```
+
+Cloud Tasks APIs and required service-agent permissions must be available in the Firebase project. Deploy frontend changes to GitHub Pages as well when the app client changes.
 
 ## Key Files Reference
 
@@ -276,10 +281,9 @@ Functions will be deployed to Firebase and accessible via their HTTP endpoints.
 
 - [**dogService.js**](src/services/dogService.js) - Dog feeding business logic
   - `subscribeToStatus()` - Real-time subscription to dog status
-  - `markFed(userName)` - Updates Firestore and sends notifications
+  - `markFed(userName)` - Updates Firestore; a backend trigger sends feed notifications
   - `setSnooze(timestamp)` - Pauses reminders
   - `getFeedHistory()` - Fetches last 10 feeding logs
-  - `sendDogFedNotification()` - Calls Cloud Function to notify users
 
 - [**settingsService.js**](src/services/settingsService.js) - Settings management
   - `subscribeToSettings()` - Real-time settings subscription
@@ -292,8 +296,9 @@ Functions will be deployed to Firebase and accessible via their HTTP endpoints.
 
 - [**firebase.js**](src/services/firebase.js) - Firebase setup and FCM
   - Firebase initialization with project config
-  - `requestNotificationPermission()` - Requests browser permission and generates FCM token
-  - `listenForMessages()` - Handles foreground push messages
+  - `requestNotificationPermission()` - Requests browser permission from Settings and generates an FCM token
+  - `refreshNotificationToken()` - Refreshes a token when permission is already granted
+  - `listenForMessages()` - Handles foreground push messages and returns its unsubscribe function
 
 - [**SettingsPanel.jsx**](src/components/SettingsPanel.jsx) - Settings UI
   - Modal with form inputs for all settings
@@ -303,13 +308,11 @@ Functions will be deployed to Firebase and accessible via their HTTP endpoints.
 ### Backend
 
 - [**functions/index.js**](functions/index.js) - Cloud Functions
-  - `reminderCheck()` - Scheduled function (every 15 min)
-    - Checks if dog was fed today
-    - Sends reminders if conditions met (after reminder time, every 4 hours)
-    - Handles timezone conversion for US/Eastern
-  - `sendDogFedNotification()` - HTTP endpoint
-    - Called when dog is marked as fed
-    - Sends "dog fed" notification to all subscribed users
+  - Firestore triggers reconcile tasks when feeding state or reminder settings change
+  - `enqueueReminderTask()` - Enqueues the current task from scheduler state
+  - `reminderDispatch()` - Validates, sends, and schedules the next four-hour reminder
+  - A Firestore feed trigger sends "dog fed" notifications with event deduplication
+- [**reminderLogic.js**](functions/reminderLogic.js) and [**reminderScheduler.js**](functions/reminderScheduler.js) - Time-zone-aware reminder timing and task scheduling
 
 ### PWA & Config
 
@@ -341,6 +344,8 @@ npm run deploy       # Build and deploy to GitHub Pages
 npm run serve        # Start local Firebase Functions emulator
 npm run deploy       # Deploy Cloud Functions to Firebase
 npm run logs         # View Cloud Function logs
+npm test             # Run Cloud Functions reminder tests
+npm run bootstrap:reminders # Initialize the first reminder task (requires ADC)
 ```
 
 **Happy feeding! 🐶**

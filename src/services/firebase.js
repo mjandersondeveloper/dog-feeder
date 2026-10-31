@@ -1,6 +1,11 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import {
+  getMessaging,
+  getToken,
+  isSupported,
+  onMessage
+} from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBXO76RlgSt8sxZz9YX3j8S5ku28edEFYY",
@@ -16,60 +21,72 @@ export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
 /**
- * Request permission + get FCM token
+ * Request permission from an explicit user action and register this device.
  */
 export const requestNotificationPermission = async () => {
-  try {
-    if (!("Notification" in window)) {
-      console.warn("⚠️ Notifications not supported in this browser");
-      return null;
-    }
+  if (!("Notification" in window)) {
+    throw new Error("This browser does not support notifications.");
+  }
 
-    console.log("🔔 Requesting notification permission...");
-    const permission = await Notification.requestPermission();
-    
-    if (permission !== "granted") {
-      console.warn("⚠️ Notification permission denied:", permission);
-      return null;
-    }
+  if (!(await isSupported())) {
+    throw new Error("Firebase messaging is not supported in this browser.");
+  }
 
-    console.log("✅ Notification permission granted");
+  let permission = Notification.permission;
+  if (permission === "default") {
+    permission = await Notification.requestPermission();
+  }
 
-    const messaging = getMessaging(app);
-    const swRegistration = await navigator.serviceWorker.ready;
+  if (permission !== "granted") {
+    throw new Error(
+      permission === "denied"
+        ? "Notifications are blocked in this browser's site settings."
+        : "Notification permission was not granted."
+    );
+  }
 
-    if (!swRegistration.active) {
-      console.error("❌ Service Worker is not active");
-      return null;
-    }
+  return getFcmToken();
+};
 
-    const token = await getToken(messaging, {
-      vapidKey: "BNf2DZy04ygatabEREkc-ta6tPf4zT1xrXQlwsU-_aQZbdng5Cm0E0xOH-1SM0PjbyOn5iZixpNNsPmYvwjuzRI",
-      serviceWorkerRegistration: swRegistration
-    });
-
-    console.log("🔥 FCM Token generated successfully");
-
-    return token;
-  } catch (err) {
-    console.error("❌ FCM Token error:", err.message, err);
+/**
+ * Refresh the FCM token when permission has already been granted.
+ */
+export const refreshNotificationToken = async () => {
+  if (!("Notification" in window) || Notification.permission !== "granted") {
     return null;
   }
+
+  if (!(await isSupported())) {
+    throw new Error("Firebase messaging is not supported in this browser.");
+  }
+
+  return getFcmToken();
+};
+
+const getFcmToken = async () => {
+  if (!("serviceWorker" in navigator)) {
+    throw new Error("This browser does not support service workers.");
+  }
+
+  const swRegistration = await navigator.serviceWorker.ready;
+  if (!swRegistration.active) {
+    throw new Error("The notification service worker is not active.");
+  }
+
+  return getToken(getMessaging(app), {
+    vapidKey: "BNf2DZy04ygatabEREkc-ta6tPf4zT1xrXQlwsU-_aQZbdng5Cm0E0xOH-1SM0PjbyOn5iZixpNNsPmYvwjuzRI",
+    serviceWorkerRegistration: swRegistration
+  });
 };
 
 /**
  * Foreground message handler
  */
-export const listenForMessages = () => {
+export const listenForMessages = async (callback) => {
+  if (!(await isSupported())) {
+    throw new Error("Firebase messaging is not supported in this browser.");
+  }
+
   const messaging = getMessaging(app);
-
-  onMessage(messaging, (payload) => {
-    console.log("📩 Foreground message:", payload);
-
-    alert(
-      payload.notification?.title +
-        "\n" +
-        payload.notification?.body
-    );
-  });
+  return onMessage(messaging, callback);
 };
