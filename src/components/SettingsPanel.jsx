@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { subscribeToSettings, updateSettings } from "../services/settingsService";
 import { subscribeToUser, updateUser } from "../services/userService";
+import { requestNotificationPermission } from "../services/firebase";
 
 export default function SettingsPanel() {
   const [settings, setSettings] = useState(null);
   const [user, setUser] = useState(null);
   const [open, setOpen] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
 
   useEffect(() => {
     const unsubSettings = subscribeToSettings(setSettings);
@@ -35,6 +37,29 @@ export default function SettingsPanel() {
 
     setOpen(false);
   };
+
+  const enableNotifications = async () => {
+    setNotificationMessage("");
+
+    try {
+      const token = await requestNotificationPermission();
+      await updateUser({ token, notificationsEnabled: true });
+      setNotificationMessage("Notifications are enabled on this device.");
+    } catch (error) {
+      console.error("Failed to enable notifications:", error);
+      setNotificationMessage(error.message);
+    }
+  };
+
+  const needsNotificationRegistration =
+    user.notificationsEnabled &&
+    (
+      !user.token ||
+      (
+        typeof Notification !== "undefined" &&
+        Notification.permission !== "granted"
+      )
+    );
 
   return (
     <>
@@ -86,6 +111,14 @@ export default function SettingsPanel() {
               })
             }
           />
+          {needsNotificationRegistration && (
+            <button type="button" onClick={enableNotifications}>
+              Enable Notifications on This Device
+            </button>
+          )}
+          {notificationMessage && (
+            <p role="status">{notificationMessage}</p>
+          )}
 
           <label>Default Snooze Hours</label>
           <input

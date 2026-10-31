@@ -6,11 +6,13 @@
     "shell": "firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
+    "bootstrap:reminders": "node scripts/bootstrap-reminders.js",
     "logs": "firebase functions:log",
+    "test": "node --test",
     "lint": "echo 'No lint configured'"
   },
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "dependencies": {

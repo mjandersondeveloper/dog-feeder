@@ -17,20 +17,22 @@ self.addEventListener("push", (event) => {
   let payload = {};
 
   try {
-    payload = event.data.json();
+    payload = event.data?.json() || {};
   } catch (err) {
     console.error("❌ Failed to parse push payload:", err);
-    payload = {};
   }
 
   const title =
     payload.notification?.title || "🐶 Dog Reminder";
+  const icon = new URL("icon-192.png", self.registration.scope).href;
+  const badge = new URL("notification-badge.png", self.registration.scope).href;
+  const notificationKind = payload.data?.kind || "reminder";
 
   const options = {
     body: payload.notification?.body || "Feed the dog!",
-    icon: "/dog-feeder/icon-192.png",
-    badge: "/dog-feeder/notification-badge.png",
-    tag: "dog-feeder-notification",
+    icon,
+    badge,
+    tag: `dog-feeder-${notificationKind}`,
     requireInteraction: true
   };
 

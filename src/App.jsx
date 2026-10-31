@@ -1,55 +1,133 @@
 import "./styles/app.css";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   subscribeToStatus,
   markFed,
   getFeedHistory,
+  initializeReminderSchedule,
   setSnooze
 } from "./services/dogService";
 import { subscribeToSettings } from "./services/settingsService";
 import { subscribeToUser, updateUser } from "./services/userService";
 import SettingsPanel from "./components/SettingsPanel";
-import { requestNotificationPermission, listenForMessages } from "./services/firebase";
+import {
+  listenForMessages,
+  refreshNotificationToken
+} from "./services/firebase";
+
+const feedDateFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
 
 export default function App() {
   const [status, setStatus] = useState(null);
   const [settings, setSettings] = useState(null);
   const [user, setUser] = useState(null);
   const [history, setHistory] = useState([]);
+  const [notificationError, setNotificationError] = useState("");
+
+  const loadHistory = useCallback(async () => {
+    setHistory(await getFeedHistory());
+  }, []);
 
   useEffect(() => {
     const unsubStatus = subscribeToStatus(setStatus);
     const unsubSettings = subscribeToSettings(setSettings);
     const unsubUser = subscribeToUser(setUser);
 
-    loadHistory();
+    getFeedHistory()
+      .then((feedHistory) => setHistory(feedHistory))
+      .catch((error) => {
+        console.error("Failed to load feed history:", error);
+        setNotificationError("Feed history could not be loaded.");
+      });
 
     return () => {
       unsubStatus();
       unsubSettings();
       unsubUser();
     };
-  }, []);
+  }, [loadHistory]);
 
   useEffect(() => {
-    const initFCM = async () => {
-      if (!user) return;
+    if (!status || status.reminderScheduleBootstrapAt) {
+      return;
+    }
 
-      const token = await requestNotificationPermission();
+    initializeReminderSchedule(status).catch((error) => {
+      console.error("Failed to initialize the reminder schedule:", error);
+      setNotificationError(
+        "Reminder scheduling could not be initialized. Check the app connection and reload."
+      );
+    });
+  }, [status]);
 
-      if (token) {
-        await updateUser({ token });
-      }
+  useEffect(() => {
+    let cancelled = false;
 
-      listenForMessages();
+    if (
+      !user?.notificationsEnabled ||
+      typeof Notification === "undefined" ||
+      Notification.permission !== "granted"
+    ) {
+      return undefined;
+    }
+
+    refreshNotificationToken()
+      .then(async (token) => {
+        if (!cancelled && token && token !== user.token) {
+          await updateUser({ token });
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to refresh the FCM token:", error);
+        if (!cancelled) {
+          setNotificationError(
+            "Push notifications could not be registered on this device. Check notification and browser settings."
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
     };
+  }, [user?.notificationsEnabled, user?.token]);
 
-    initFCM();
-  }, [user]);
+  useEffect(() => {
+    let cancelled = false;
+    let unsubscribe;
 
-  const loadHistory = async () => {
-    setHistory(await getFeedHistory());
-  };
+    listenForMessages((payload) => {
+      alert(
+        `${payload.notification?.title || "Dog Feeder"}\n${
+          payload.notification?.body || ""
+        }`
+      );
+    })
+      .then((stopListening) => {
+        if (cancelled) {
+          stopListening();
+        } else {
+          unsubscribe = stopListening;
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to initialize foreground notifications:", error);
+        if (!cancelled) {
+          setNotificationError(
+            "Foreground notifications are unavailable in this browser."
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, []);
 
   const handleFed = async () => {
     await markFed(user.name);
@@ -67,14 +145,18 @@ export default function App() {
     return <div>Loading...</div>;
   }
 
+  const currentDate = new Date();
   const alreadyFedToday =
     status.lastFedAt &&
-    new Date(status.lastFedAt).toDateString() ===
-      new Date().toDateString();
+    feedDateFormatter.format(new Date(status.lastFedAt)) ===
+      feedDateFormatter.format(currentDate);
 
   return (
     <div className="app">
       <SettingsPanel />
+      {notificationError && (
+        <p role="alert">{notificationError}</p>
+      )}
       <div className="card">
         <h1>🐶 Dog Feeder</h1>
         <div className="status">
@@ -90,7 +172,7 @@ export default function App() {
           </p>
 
           {status.snoozedUntil &&
-            Date.now() < status.snoozedUntil && (
+            currentDate.getTime() < status.snoozedUntil && (
               <p>
                 <strong>Snoozed Until:</strong><br />
                 {new Date(status.snoozedUntil).toLocaleString()}
