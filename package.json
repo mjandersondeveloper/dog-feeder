@@ -1,7 +1,7 @@
 {
   "name": "dog-feeder",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "homepage": "https://https://mjandersondeveloper.github.io/dog-feeder",
   "type": "module",
   "scripts": {
